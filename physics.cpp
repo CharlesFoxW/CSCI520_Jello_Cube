@@ -11,6 +11,7 @@
 
 #define UNDEFORMED_STRUCT_LEN    0.142857
 
+
 /* Computes acceleration to every control point of the jello cube, 
    which is in state given by 'jello'.
    Returns result in array 'a'. */
@@ -271,6 +272,34 @@ void computeAcceleration(struct world * jello, struct point a[8][8][8])
                     normal.z = -1;
                     collisionForce.z += jello->kCollision * fabs(jello->p[i][j][k].z - 2.0) * normal.z;
                     collisionForce.z += -1.0 * jello->dCollision * jello->v[i][j][k].z;
+                }
+
+                if (jello->incPlanePresent) {
+                    point direction = {};
+                    point OrthoRoot = {};
+                    point samplePoint = jello->p[i][j][k];
+                    double t, top, bottom, length;
+                    top = jello->a * samplePoint.x + jello->b * samplePoint.y + jello->c * samplePoint.z + jello->d;
+                    bottom = jello->a * jello->a + jello->b * jello->b + jello->c * jello->c;
+                    t = -1.0 * top / bottom;
+                    OrthoRoot.x = jello->a * t + samplePoint.x;
+                    OrthoRoot.y = jello->b * t + samplePoint.y;
+                    OrthoRoot.z = jello->c * t + samplePoint.z;
+
+                    direction.x = samplePoint.x - OrthoRoot.x;
+                    direction.y = samplePoint.y - OrthoRoot.y;
+                    direction.z = samplePoint.z - OrthoRoot.z;
+
+                    if (direction.x * normalDirection.x + direction.y * normalDirection.y
+                        + direction.z * normalDirection.z < 0) {
+
+                        collisionForce.x += jello->kCollision * fabs(direction.x) * normalDirection.x;
+                        collisionForce.x += -1.0 * jello->dCollision * jello->v[i][j][k].x;
+                        collisionForce.y += jello->kCollision * fabs(direction.y) * normalDirection.y;
+                        collisionForce.y += -1.0 * jello->dCollision * jello->v[i][j][k].y;
+                        collisionForce.z += jello->kCollision * fabs(direction.z) * normalDirection.z;
+                        collisionForce.z += -1.0 * jello->dCollision * jello->v[i][j][k].z;
+                    }
                 }
 
                 pSUM(netForce, collisionForce, netForce);

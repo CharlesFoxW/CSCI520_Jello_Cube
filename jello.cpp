@@ -33,6 +33,12 @@ struct world jello;
 
 int windowWidth, windowHeight;
 
+// for inclined plane display
+struct point intersections[5];
+int numOfIntersections = 0;
+
+struct point normalDirection = {};
+
 void myinit()
 {
   glMatrixMode(GL_PROJECTION);
@@ -40,7 +46,7 @@ void myinit()
   gluPerspective(90.0,1.0,0.01,1000.0);
 
   // set background color
-  glClearColor(0.15, 0.15, 0.15, 0.0);
+  glClearColor(0.1, 0.1, 0.1, 0.0);
 
   glCullFace(GL_BACK);
   glEnable(GL_CULL_FACE);
@@ -192,17 +198,56 @@ void display()
     // show the inclined plane:
     if (jello.incPlanePresent) {
 
+        //show the edges of inclined plane:
+        glColor4f(0.8,0.9,0.8,1.0);
+        glBegin(GL_LINES);
+        for (int i = 0; i < numOfIntersections - 1; i++) {
+            glVertex3f((GLfloat) intersections[i].x, (GLfloat) intersections[i].y, (GLfloat) intersections[i].z);
+            glVertex3f((GLfloat) intersections[i+1].x, (GLfloat) intersections[i+1].y, (GLfloat) intersections[i+1].z);
+        }
+        glVertex3f((GLfloat) intersections[numOfIntersections - 1].x, (GLfloat) intersections[numOfIntersections - 1].y,
+                   (GLfloat) intersections[numOfIntersections - 1].z);
+        glVertex3f((GLfloat) intersections[0].x, (GLfloat) intersections[0].y, (GLfloat) intersections[0].z);
+        glEnd();
+
+        // show the 2 sides of the inclined plane:
+        glFrontFace(GL_CW);
+        glColor4f(0.7,0.5,0.3,0);
+
+        glBegin(GL_TRIANGLES);
+        for (int i = 0; i < numOfIntersections - 2; i++) {
+            glVertex3f((GLfloat) intersections[i].x, (GLfloat) intersections[i].y, (GLfloat) intersections[i].z);
+            glVertex3f((GLfloat) intersections[i+1].x, (GLfloat) intersections[i+1].y, (GLfloat) intersections[i+1].z);
+            glVertex3f((GLfloat) intersections[i+2].x, (GLfloat) intersections[i+2].y, (GLfloat) intersections[i+2].z);
+        }
+
+        glVertex3f((GLfloat) intersections[numOfIntersections-2].x, (GLfloat) intersections[numOfIntersections-2].y,
+                   (GLfloat) intersections[numOfIntersections-2].z);
+        glVertex3f((GLfloat) intersections[numOfIntersections-1].x, (GLfloat) intersections[numOfIntersections-1].y,
+                   (GLfloat) intersections[numOfIntersections-1].z);
+        glVertex3f((GLfloat) intersections[0].x, (GLfloat) intersections[0].y, (GLfloat) intersections[0].z);
+
+        glEnd();
+
+        glFrontFace(GL_CCW);
+        glColor4f(0.3,0.5,0.7,0);
+
+        glBegin(GL_TRIANGLES);
+        for (int i = 0; i < numOfIntersections - 2; i++) {
+            glVertex3f((GLfloat) intersections[i].x, (GLfloat) intersections[i].y, (GLfloat) intersections[i].z);
+            glVertex3f((GLfloat) intersections[i+1].x, (GLfloat) intersections[i+1].y, (GLfloat) intersections[i+1].z);
+            glVertex3f((GLfloat) intersections[i+2].x, (GLfloat) intersections[i+2].y, (GLfloat) intersections[i+2].z);
+        }
+
+        glVertex3f((GLfloat) intersections[numOfIntersections-2].x, (GLfloat) intersections[numOfIntersections-2].y,
+                   (GLfloat) intersections[numOfIntersections-2].z);
+        glVertex3f((GLfloat) intersections[numOfIntersections-1].x, (GLfloat) intersections[numOfIntersections-1].y,
+                   (GLfloat) intersections[numOfIntersections-1].z);
+        glVertex3f((GLfloat) intersections[0].x, (GLfloat) intersections[0].y, (GLfloat) intersections[0].z);
+
+        glEnd();
     }
 
-
-    // calculate the physics:
-    if (strcmp(jello.integrator, "RK4") == 0)
-        RK4(&jello);
-    else if (strcmp(jello.integrator, "Euler") == 0)
-        Euler(&jello);
-
-
- 
   glutSwapBuffers();
 }
 
@@ -232,6 +277,11 @@ void doIdle()
   if (pause == 0)
   {
     // insert code which appropriately performs one step of the cube simulation:
+      // calculate the physics:
+      if (strcmp(jello.integrator, "RK4") == 0)
+          RK4(&jello);
+      else if (strcmp(jello.integrator, "Euler") == 0)
+          Euler(&jello);
   }
 
   glutPostRedisplay();
@@ -248,6 +298,9 @@ int main (int argc, char ** argv)
 
   readWorld(argv[1],&jello);
 
+    if (jello.incPlanePresent)
+        findIntersections(jello);
+
   glutInit(&argc,argv);
   
   /* double buffered window, use depth testing, 640x480 */
@@ -256,7 +309,7 @@ int main (int argc, char ** argv)
   windowWidth = 640;
   windowHeight = 480;
   glutInitWindowSize (windowWidth, windowHeight);
-  glutInitWindowPosition (1000,0);
+  glutInitWindowPosition (500,0);
   glutCreateWindow ("Jello cube");
 
   /* tells glut to use a particular display function to redraw */
@@ -287,5 +340,145 @@ int main (int argc, char ** argv)
   glutMainLoop();
 
   return(0);
+}
+
+// inclined plane initial calculation
+void findIntersections(struct world jello) {
+    double slideRange;
+    point tempPoint = {};
+
+    for (int i = 0; i < 5; i++)
+        intersections[i] = {};
+    numOfIntersections = 0;
+
+    // x-direction 4 lines:
+    slideRange = (-1.0 * jello.d - 2.0 * jello.c - 2.0 * jello.b) / jello.a;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = slideRange;
+        tempPoint.y = 2.0;
+        tempPoint.z = 2.0;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d + 2.0 * jello.c - 2.0 * jello.b) / jello.a;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = slideRange;
+        tempPoint.y = 2.0;
+        tempPoint.z = -2.0;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d - 2.0 * jello.c + 2.0 * jello.b) / jello.a;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = slideRange;
+        tempPoint.y = -2.0;
+        tempPoint.z = 2.0;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d + 2.0 * jello.c + 2.0 * jello.b) / jello.a;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = slideRange;
+        tempPoint.y = -2.0;
+        tempPoint.z = -2.0;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    //y-direction 4 lines:
+    slideRange = (-1.0 * jello.d - 2.0 * jello.c - 2.0 * jello.a) / jello.b;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = 2.0;
+        tempPoint.y = slideRange;
+        tempPoint.z = 2.0;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d + 2.0 * jello.c - 2.0 * jello.a) / jello.b;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = 2.0;
+        tempPoint.y = slideRange;
+        tempPoint.z = -2.0;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d - 2.0 * jello.c + 2.0 * jello.a) / jello.b;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = -2.0;
+        tempPoint.y = slideRange;
+        tempPoint.z = 2.0;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d + 2.0 * jello.c + 2.0 * jello.a) / jello.b;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = -2.0;
+        tempPoint.y = slideRange;
+        tempPoint.z = -2.0;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    //z-direction 4 lines:
+    slideRange = (-1.0 * jello.d - 2.0 * jello.b - 2.0 * jello.a) / jello.c;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = 2.0;
+        tempPoint.y = 2.0;
+        tempPoint.z = slideRange;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d + 2.0 * jello.b - 2.0 * jello.a) / jello.c;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = 2.0;
+        tempPoint.y = -2.0;
+        tempPoint.z = slideRange;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d - 2.0 * jello.b + 2.0 * jello.a) / jello.c;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = -2.0;
+        tempPoint.y = 2.0;
+        tempPoint.z = slideRange;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    slideRange = (-1.0 * jello.d + 2.0 * jello.b + 2.0 * jello.a) / jello.c;
+    if (slideRange >= -2.0 && slideRange <= 2.0) {
+        tempPoint.x = -2.0;
+        tempPoint.y = -2.0;
+        tempPoint.z = slideRange;
+        intersections[numOfIntersections] = tempPoint;
+        numOfIntersections++;
+    }
+
+    //find the "active side" of the inclined plane:
+    point direction = {};
+    point OrthoRoot = {};
+    point samplePoint = jello.p[0][0][0];
+    double t, top, bottom, length;
+    top = jello.a * samplePoint.x + jello.b * samplePoint.y + jello.c * samplePoint.z + jello.d;
+    bottom = jello.a * jello.a + jello.b * jello.b + jello.c * jello.c;
+    t = -1.0 * top / bottom;
+    OrthoRoot.x = jello.a * t + samplePoint.x;
+    OrthoRoot.y = jello.b * t + samplePoint.y;
+    OrthoRoot.z = jello.c * t + samplePoint.z;
+    direction.x = samplePoint.x - OrthoRoot.x;
+    direction.y = samplePoint.y - OrthoRoot.y;
+    direction.z = samplePoint.z - OrthoRoot.z;
+    length = sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+    normalDirection.x = direction.x / length;
+    normalDirection.y = direction.y / length;
+    normalDirection.z = direction.z / length;
 }
 

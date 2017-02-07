@@ -33,6 +33,8 @@ extern int sprite;
 extern int g_vMousePos[2];
 extern int g_iLeftMouseButton,g_iMiddleMouseButton,g_iRightMouseButton;
 
+
+
 struct point 
 {
    double x;
@@ -62,6 +64,12 @@ struct world
 };
 
 extern struct world jello;
+
+// for inclined plane
+extern struct point intersections[];
+extern int numOfIntersections;
+
+extern struct point normalDirection;
 
 // computes crossproduct of three vectors, which are given as points
 // struct point vector1, vector2, dest
@@ -105,9 +113,9 @@ extern struct world jello;
 // double x,y,z
 #define pMAKE(x,y,z,dest)\
 \
-  (dest).(x) = (x);\
-  (dest).(y) = (y);\
-  (dest).(z) = (z);
+  (dest).x /= x;\
+  (dest).y /= y;\
+  (dest).z /= z;
 
 // sums points src1 and src2 to dest
 // struct point src1,src2,dest
@@ -133,6 +141,11 @@ extern struct world jello;
   (dest).x = (src).x * (scalar);\
   (dest).y = (src).y * (scalar);\
   (dest).z = (src).z * (scalar);
+
+
+
+// inclined plane initial calculation
+void findIntersections(struct world jello);
 
 #endif
 
